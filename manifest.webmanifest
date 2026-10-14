@@ -1,0 +1,9 @@
+{
+  "name": "Minimal FreeCell",
+  "short_name": "FreeCell",
+  "display": "standalone",
+  "start_url": "./",
+  "scope": "./",
+  "background_color": "#10161d",
+  "theme_color": "#10161d"
+}
