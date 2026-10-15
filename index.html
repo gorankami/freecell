@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#10161d">
+  <title>Minimal FreeCell</title>
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <h1>FreeCell</h1>
+    <button id="new-game" type="button">New game</button>
+  </header>
+
+  <main id="board" aria-label="FreeCell board">
+    <section class="top-row" aria-label="Free cells and foundations">
+      <div class="slots" id="freecells" aria-label="Free cells"></div>
+      <div class="slots" id="foundations" aria-label="Foundations"></div>
+    </section>
+    <section class="tableau" id="tableau" aria-label="Tableau columns"></section>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>
