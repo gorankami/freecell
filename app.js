@@ -46,10 +46,6 @@
     autoMoveObvious();
   }
 
-  function cardLabel(card) {
-    return `${ranks[card.value - 1]}${card.suit}`;
-  }
-
   function getFoundationIndex(card) {
     return suits.indexOf(card.suit);
   }
@@ -178,13 +174,76 @@
     return true;
   }
 
+  function firstEmptyFreecellIndex() {
+    return state.freecells.findIndex((cell) => !cell);
+  }
+
+  function findAutoTableauDestination(card, sourceColumnIndex = -1) {
+    for (let i = 0; i < state.tableau.length; i += 1) {
+      if (i === sourceColumnIndex) continue;
+      const target = state.tableau[i][state.tableau[i].length - 1];
+      if (target && canStackOn(card, target)) return i;
+    }
+    return -1;
+  }
+
+  function tryAutoTapMoveFromTableau(columnIndex, cardIndex) {
+    const column = state.tableau[columnIndex];
+    if (cardIndex !== column.length - 1) return false;
+    const card = column[cardIndex];
+    if (!card) return false;
+
+    const destination = findAutoTableauDestination(card, columnIndex);
+    if (destination >= 0) {
+      column.pop();
+      state.tableau[destination].push(card);
+      return true;
+    }
+
+    const freecellIndex = firstEmptyFreecellIndex();
+    if (freecellIndex >= 0) {
+      column.pop();
+      state.freecells[freecellIndex] = card;
+      return true;
+    }
+
+    return false;
+  }
+
+  function tryAutoTapMoveFromFreecell(index) {
+    const card = state.freecells[index];
+    if (!card) return false;
+    const destination = findAutoTableauDestination(card);
+    if (destination < 0) return false;
+    state.freecells[index] = null;
+    state.tableau[destination].push(card);
+    return true;
+  }
+
+  function finalizeMovedCard() {
+    clearSelection();
+    render();
+    autoMoveObvious();
+    autoFinishIfReady();
+    render();
+  }
+
   function onSlotTap(type, index, maybeCardIndex) {
     if (!state.selection) {
       if (type === "freecell" && state.freecells[index]) {
+        if (tryAutoTapMoveFromFreecell(index)) {
+          finalizeMovedCard();
+          return;
+        }
         state.selection = { type: "freecell", index };
         render();
       } else if (type === "tableau") {
-        trySelectFromTableau(index, maybeCardIndex ?? state.tableau[index].length - 1);
+        const cardIndex = maybeCardIndex ?? state.tableau[index].length - 1;
+        if (tryAutoTapMoveFromTableau(index, cardIndex)) {
+          finalizeMovedCard();
+          return;
+        }
+        trySelectFromTableau(index, cardIndex);
       }
       return;
     }
@@ -199,11 +258,9 @@
       return;
     }
 
-    clearSelection();
-    render();
-    if (moved) {
-      autoMoveObvious();
-      autoFinishIfReady();
+    if (moved) finalizeMovedCard();
+    else {
+      clearSelection();
       render();
     }
   }
@@ -276,11 +333,43 @@
     const el = document.createElement("button");
     el.type = "button";
     el.className = `card ${isRed(card) ? "red" : ""}${selected ? " selected" : ""}`;
-    el.textContent = cardLabel(card);
+    el.dataset.cardId = card.id;
+    const rank = ranks[card.value - 1];
+    el.innerHTML = `
+      <span class="card-corner">
+        <span class="card-rank">${rank}</span>
+        <span class="card-suit">${card.suit}</span>
+      </span>
+      <span class="card-center-suit">${card.suit}</span>
+    `;
     return el;
   }
 
+  function animateCardMoves(previousRects) {
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    document.querySelectorAll(".card[data-card-id]").forEach((cardEl) => {
+      const previousRect = previousRects.get(cardEl.dataset.cardId);
+      if (!previousRect) return;
+      const nextRect = cardEl.getBoundingClientRect();
+      const dx = previousRect.left - nextRect.left;
+      const dy = previousRect.top - nextRect.top;
+      if (Math.abs(dx) < 1 && Math.abs(dy) < 1) return;
+      cardEl.animate(
+        [
+          { transform: `translate(${dx}px, ${dy}px)` },
+          { transform: "" },
+        ],
+        { duration: 220, easing: "ease-out" },
+      );
+    });
+  }
+
   function render() {
+    const previousRects = new Map();
+    document.querySelectorAll(".card[data-card-id]").forEach((cardEl) => {
+      previousRects.set(cardEl.dataset.cardId, cardEl.getBoundingClientRect());
+    });
+
     board.freecells.innerHTML = "";
     board.foundations.innerHTML = "";
     board.tableau.innerHTML = "";
@@ -327,6 +416,8 @@
       }
       board.tableau.appendChild(columnEl);
     }
+
+    animateCardMoves(previousRects);
   }
 
   board.newGame.addEventListener("click", newGame);
